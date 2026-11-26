@@ -37,6 +37,7 @@ Route::post('notification/send-booking', [App\Http\Controllers\NotificationContr
 Route::middleware(['permission:fuel-request,fuel.request.list'])->group(function () {
    Route::get('/fuel-request', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelRequestListing'])->name('fuel.request');
    Route::get('/fuel-request/save/{id?}', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelRequestSave'])->name('fuel.request.form');
+   Route::get('/fuel-request/receive/{id}', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelRequestReceive'])->name('fuel.request.receive');
 });
 
 Route::get('/fuel-purchases', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelPurchasesListing'])->name('fuel.purchases');

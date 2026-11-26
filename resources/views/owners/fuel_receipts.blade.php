@@ -102,6 +102,7 @@
 @endsection
 
 @section('scripts')
+@include('fuel_request.receipt_functions')
 <script>
     var database = firebase.firestore();
     var ownerId = "{{ $id }}";
@@ -287,8 +288,15 @@
                     return showModalError("{{ trans('lang.fuel_receipt_fuel_error') }}");
                 }
                 var fuelRequestId = $('#receipt_request').val() || null;
-                var receiptRef = database.collection('fuel_receipts').doc();
-                await receiptRef.set({
+                // A request's receipt is always request_<id>, so a request is never recorded twice
+                if (fuelRequestId && await findFuelRequestReceipt(fuelRequestId)) {
+                    jQuery("#overlay").hide();
+                    return showModalError("{{ trans('lang.receive_fuel_already_added_short') }}");
+                }
+                var receiptRef = fuelRequestId
+                    ? database.collection('fuel_receipts').doc(fuelRequestReceiptId(fuelRequestId))
+                    : database.collection('fuel_receipts').doc();
+                var receiptData = {
                     'id': receiptRef.id,
                     'ownerId': ownerId,
                     'fuelTypeId': fuel.fuelTypeId,
@@ -300,6 +308,13 @@
                     'note': note !== '' ? note : null,
                     'createdBy': '{{ auth()->id() }}',
                     'createdAt': firebase.firestore.FieldValue.serverTimestamp()
+                };
+                await database.runTransaction(async function (transaction) {
+                    var existing = await transaction.get(receiptRef);
+                    if (existing.exists) {
+                        throw new Error("{{ trans('lang.receive_fuel_already_added_short') }}");
+                    }
+                    transaction.set(receiptRef, receiptData);
                 });
                 logFirebaseActivity('#' + receiptRef.id + ' {{ trans("lang.fuel_receiving_history") }} {{ trans("lang.created") }}');
             }

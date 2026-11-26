@@ -246,9 +246,6 @@
         var allocatedOtherDate = '';
         var lastStatus = '';
         var fcmToken = '';
-        var pendingFuelRequests = [];
-        var fuelTypesRendered = false;
-        var pendingRequestsLoaded = false;
         $(document).ready(function() {
 
             $('.owner_menu').addClass('active');
@@ -336,12 +333,6 @@
                         capacityhtml = capacityhtml + '<div class="col-7">';
                         capacityhtml = capacityhtml + '<input type="text" class="form-control" id="' + data.name + '_capacity">';
                         capacityhtml = capacityhtml + '<input type="hidden" class="form-control" id="' + data.name + '_available_capacity">';
-                        // Which completed fuel request this allocation delivers (fuel_receipts)
-                        capacityhtml = capacityhtml + '<div class="d-none mt-2 allocation_request_box" data-fuel-type-id="' + data.id + '">';
-                        capacityhtml = capacityhtml + '<label class="control-label">{{ trans('lang.fuel_receipt_allocation_for') }}</label>';
-                        capacityhtml = capacityhtml + '<select class="form-control" id="' + data.name + '_allocation_request"></select>';
-                        capacityhtml = capacityhtml + '<div class="form-text text-muted">{{ trans('lang.fuel_receipt_allocation_for_help') }}</div>';
-                        capacityhtml = capacityhtml + '</div>';
 
                         capacityhtml = capacityhtml + '</div>';
                         capacityhtml = capacityhtml + '</div>';
@@ -351,29 +342,7 @@
                     $('#fuel_capacity_div').html(capacityhtml);
 
                 }
-                fuelTypesRendered = true;
-                renderAllocationRequestSelects();
             })
-
-            // Completed fuel requests of this station that have no delivery record yet
-            Promise.all([
-                database.collection('fuel_request').where('ownerId', '==', id).get(),
-                database.collection('fuel_receipts').where('ownerId', '==', id).get()
-            ]).then(function(snapshots) {
-                var requests = snapshots[0].docs.map(function(doc) {
-                    var data = doc.data();
-                    data.id = data.id || doc.id;
-                    return data;
-                });
-                var receipts = snapshots[1].docs.map(function(doc) {
-                    return doc.data();
-                });
-                pendingFuelRequests = pendingFuelRequestsFrom(requests, receipts);
-                pendingRequestsLoaded = true;
-                renderAllocationRequestSelects();
-            }).catch(function(error) {
-                console.error(error);
-            });
             $('.fuel_type').on('click', function() {
                 toggleCapacityFields();
             });
@@ -572,13 +541,14 @@
 
                             }
 
-                            // New allocation for this fuel: record it as a delivery (fuel_receipts)
+                            // New allocation for this fuel: record it as a direct allocation (fuel_receipts).
+                            // Fuel of a completed fuel request is added on the fuel request's "Add received fuel" step.
                             if (isNewAllocation && parseFloat(capacityVal) > 0) {
-                                var linkedRequestId = $('#' + value + '_allocation_request').val() || '';
-                                var linkedRequest = pendingFuelRequests.find(function(request) {
-                                    return request.id === linkedRequestId && request.fuelTypeId === fuelTypeId;
+                                fuelReceipts.push({
+                                    'fuelTypeId': fuelTypeId,
+                                    'fuelTypeName': value,
+                                    'litres': parseFloat(capacityVal)
                                 });
-                                fuelReceipts.push(allocationReceipt(fuelTypeId, value, capacityVal, linkedRequest));
                             }
 
                             fuel.push(fuelObj);
@@ -707,8 +677,8 @@
                                         'fuelTypeName': receipt.fuelTypeName,
                                         'litres': receipt.litres,
                                         'receivedAt': firebase.firestore.FieldValue.serverTimestamp(),
-                                        'source': receipt.source,
-                                        'fuelRequestId': receipt.fuelRequestId,
+                                        'source': 'allocation',
+                                        'fuelRequestId': null,
                                         'note': null,
                                         'createdBy': '{{ auth()->id() }}',
                                         'createdAt': firebase.firestore.FieldValue.serverTimestamp()
@@ -748,62 +718,6 @@
                 }
             })
         })
-
-        // Completed fuel requests with no fuel_receipts record yet, oldest first
-        function pendingFuelRequestsFrom(requests, receipts) {
-            var recorded = {};
-            receipts.forEach(function(receipt) {
-                if (receipt.fuelRequestId) {
-                    recorded[receipt.fuelRequestId] = true;
-                }
-            });
-            var requestTime = function(request) {
-                var time = request.updatedAt || request.createdAt;
-                return time && time.toMillis ? time.toMillis() : 0;
-            };
-            return requests.filter(function(request) {
-                return request.status === 'completedByAdmin' && !recorded[request.id];
-            }).sort(function(a, b) {
-                return requestTime(a) - requestTime(b);
-            });
-        }
-
-        // The delivery recorded for a new allocation: the linked request's litres, or else the allocated litres
-        function allocationReceipt(fuelTypeId, fuelTypeName, allocatedLitres, linkedRequest) {
-            var requestLitres = linkedRequest ? parseFloat(linkedRequest.fuelQuota) : NaN;
-            return {
-                'fuelTypeId': fuelTypeId,
-                'fuelTypeName': fuelTypeName,
-                'litres': requestLitres > 0 ? requestLitres : parseFloat(allocatedLitres),
-                'source': linkedRequest ? 'fuel_request' : 'allocation',
-                'fuelRequestId': linkedRequest ? linkedRequest.id : null
-            };
-        }
-
-        // Each fuel offers its pending requests (oldest selected) or a direct allocation
-        function renderAllocationRequestSelects() {
-            if (!fuelTypesRendered || !pendingRequestsLoaded) {
-                return;
-            }
-            $('.allocation_request_box').each(function() {
-                var box = $(this);
-                var fuelTypeId = box.attr('data-fuel-type-id');
-                var requests = pendingFuelRequests.filter(function(request) {
-                    return request.fuelTypeId === fuelTypeId;
-                });
-                if (requests.length === 0) {
-                    box.addClass('d-none');
-                    return;
-                }
-                var html = '';
-                requests.forEach(function(request) {
-                    html += '<option value="' + request.id + '">{{ trans('lang.fuel_request') }} #' + request.id + ' - ' + (request.fuelQuota || '') + ' {{ trans('lang.liter') }}</option>';
-                });
-                html += '<option value="">{{ trans('lang.fuel_receipt_no_request') }}</option>';
-                box.find('select').html(html);
-                box.removeClass('d-none');
-            });
-        }
 
         async function addResetHistory(lastCapacity, capacityVal, remaining, fuelType) {
             var tempId = database.collection('temp').doc().id;

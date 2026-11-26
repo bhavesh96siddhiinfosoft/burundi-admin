@@ -76,6 +76,11 @@
                             <span id="fuel_capacity" class="text-muted"></span>
                         </li>
 
+                        <li class="list-group-item d-flex justify-content-between d-none" id="received_fuel_row">
+                            <span class="font-weight-bold">{{ trans('lang.receive_fuel_received') }}</span>
+                            <span id="received_fuel" class="text-muted text-right"></span>
+                        </li>
+
                     </ul>
 
                 </div>
@@ -232,13 +237,13 @@
 
 @section('scripts')
 @include('distributions.status_functions')
+@include('fuel_request.receipt_functions')
 <script>
     var database = firebase.firestore();
     var requestsRef = database.collection('fuel_request');
     var fuelTypesRef = database.collection('fuel_type');
     var usersRef = database.collection('users');
     var requestId = "{{ $id }}";
-    var requestOwnerId = '';
     var linkedDistribution = null;
 
     $(document).ready(async function () {
@@ -254,7 +259,6 @@
             }
 
             const data = docSnap.data();
-            requestOwnerId = data.ownerId || '';
             $('#request_id').text(data.id);
             $('#fuel_quota').text((data.fuelQuota || '') + ' L');
             $('#status').val(data.status || '');
@@ -311,6 +315,18 @@
 
             updateStatusDropdown(data.status);
             await loadLinkedDistribution();
+
+            // Completed: has the received fuel been added to the station stock?
+            if (data.status === 'completedByAdmin') {
+                var receipt = await findFuelRequestReceipt(requestId);
+                if (receipt) {
+                    $('#received_fuel').text(receipt.litres + ' {{ trans("lang.liter") }}, ' + formatFirestoreDate(receipt.receivedAt));
+                } else {
+                    $('#received_fuel').html('<a href="{{ route("fuel.request.receive", ":id") }}'.replace(':id', encodeURIComponent(requestId)) +
+                        '" class="btn btn-sm btn-primary"><i class="fa fa-plus"></i> {{ trans("lang.receive_fuel_add_link") }}</a>');
+                }
+                $('#received_fuel_row').removeClass('d-none');
+            }
         } catch (err) {
             console.error(err);
             showError("{{ trans('lang.error_loading_request') }}: " + err.message);
@@ -464,16 +480,10 @@
             alert(message);
         }
 
-        // F5: the delivery is recorded when the station's allocation is updated on the owner page
-        if (newStatus === 'completedByAdmin' && requestOwnerId) {
-            var completedMessage = "{{ trans('lang.fuel_request_completed_allocate_confirm') }}";
-            if (linkedDistribution && distributionCanCancel(linkedDistribution.status)) {
-                completedMessage = "{{ trans('lang.fuel_request_supplied_unlocked') }} " + completedMessage;
-            }
-            if (confirm(completedMessage)) {
-                window.location.href = '{{ route("owners.edit", ":id") }}'.replace(':id', encodeURIComponent(requestOwnerId));
-                return;
-            }
+        // F5: next step, add the received fuel to the station stock (records the delivery)
+        if (newStatus === 'completedByAdmin') {
+            window.location.href = '{{ route("fuel.request.receive", ":id") }}'.replace(':id', encodeURIComponent(requestId));
+            return;
         }
         window.location.href = "{{ route('fuel.request') }}";
     });
