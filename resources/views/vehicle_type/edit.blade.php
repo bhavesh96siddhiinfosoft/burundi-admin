@@ -40,8 +40,9 @@
                             {{-- Fuel Quota --}}
                             <span id="fuel_quota_div"></span>
 
-                            {{-- Mileage Quota --}}
-                            <span id="mileage_quota_div"></span>
+                            {{-- Mileage Quota: no longer used (odometer capture was removed from the apps).
+                                 Hidden, but kept in the form so the stored values are saved unchanged. --}}
+                            <div class="d-none"><span id="mileage_quota_div"></span></div>
 
                             <div class="form-group row width-100">
                                 <div class="form-check">

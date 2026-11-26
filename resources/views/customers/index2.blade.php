@@ -429,7 +429,6 @@ $type = 'all';
  
             const id = val.id;
             let route1 = '{{route("customers.edit", ":id")}}'.replace(':id', id);
-            let route2 = '{{route("customers.odometerReadingHistory", ":id")}}'.replace(':id', id);
 
             const vehicleType = await getVehicleType(val.vehicleId, val.id);
             const fuelType = await getFuelType(val.fuelTypeId, val.id);
@@ -446,7 +445,7 @@ $type = 'all';
                 availableFuelQuota: val.availableFuelQuota || '',
                 createdAt: val.createdAt ? val.createdAt.toDate().toDateString() + ' ' + val.createdAt.toDate().toLocaleTimeString('en-US') : '',
                 documentStatus: val.documentApproved ? `<a href="javascript:void(0)" class="btn btn-primary btn-sm" name="show-documents" data-verified="true" id="${val.id}">{{trans("lang.document_verified")}}</a>` : `<a href="javascript:void(0)" class="btn btn-primary btn-sm" name="show-documents" data-verified="false" id="${val.id}">{{trans("lang.verify_document")}}</a>`,
-                actions: `<a href="${route2}"><i class="fa fa-clock-rotate-left action-btn"></i></a> <a href="${route1}"><i class="fa fa-edit action-btn"></i></a> ` + (checkDeletePermission ? `<a id="${val.id}" class="do_not_delete" name="user-delete" href="javascript:void(0)"><i class="fa fa-trash"></i></a>` : '')
+                actions: `<a href="${route1}"><i class="fa fa-edit action-btn"></i></a> ` + (checkDeletePermission ? `<a id="${val.id}" class="do_not_delete" name="user-delete" href="javascript:void(0)"><i class="fa fa-trash"></i></a>` : '')
             };
         }));
 

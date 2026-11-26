@@ -202,6 +202,66 @@
                                         <input type="checkbox" class="allow_for_all_petrol_pump" id="allow_for_all_petrol_pump">
                                         <label class="col-3 control-label" for="allow_for_all_petrol_pump">{{trans('lang.all_for_all_petrolpump_setting')}}</label>
                                     </div>
+                                    <div class="form-text pl-3 text-muted">
+                                        {{ trans('lang.all_for_all_petrolpump_setting_help') }}
+                                    </div>
+                                </div>
+                            </fieldset>
+
+                            <!-- Booking Settings (settings/booking_setting) -->
+                            <fieldset>
+
+                                <legend>
+                                    <i class="mr-3 mdi mdi-calendar-clock"></i>{{ trans('lang.booking_settings') }}
+                                </legend>
+
+                                <div class="form-group row width-50">
+                                    <label class="col-5 control-label">{{ trans('lang.booking_turn_threshold') }}</label>
+                                    <div class="col-7">
+                                        <input type="number" class="form-control" id="booking_turn_threshold" min="1" max="100" step="1">
+                                        <div class="form-text text-muted">
+                                            {{ trans('lang.booking_turn_threshold_help') }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group row width-50">
+                                    <label class="col-5 control-label">{{ trans('lang.booking_eta_window_minutes') }}</label>
+                                    <div class="col-7">
+                                        <input type="number" class="form-control" id="booking_eta_window_minutes" min="0" max="120" step="1">
+                                        <div class="form-text text-muted">
+                                            {{ trans('lang.booking_eta_window_minutes_help') }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group row width-50">
+                                    <label class="col-5 control-label">{{ trans('lang.booking_default_rate_per_hour') }}</label>
+                                    <div class="col-7">
+                                        <input type="number" class="form-control" id="booking_default_rate_per_hour" min="0" max="500" step="any">
+                                        <div class="form-text text-muted">
+                                            {{ trans('lang.booking_default_rate_per_hour_help') }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group row width-50">
+                                    <label class="col-5 control-label">{{ trans('lang.booking_qr_refresh_seconds') }}</label>
+                                    <div class="col-7">
+                                        <input type="number" class="form-control" id="booking_qr_refresh_seconds" min="15" max="600" step="1">
+                                        <div class="form-text text-muted">
+                                            {{ trans('lang.booking_qr_refresh_seconds_help') }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group row width-50">
+                                    <label class="col-5 control-label">{{ trans('lang.booking_qr_max_age_minutes') }}</label>
+                                    <div class="col-7">
+                                        <input type="number" class="form-control" id="booking_qr_max_age_minutes" min="1" step="1">
+                                        <div class="form-text text-muted">
+                                            {{ trans('lang.booking_qr_max_age_minutes_help') }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-text pl-3 text-muted">
+                                    {{ trans('lang.booking_settings_apply_help') }}
                                 </div>
                             </fieldset>
                         </div>
@@ -231,6 +291,16 @@
             var refNotificationSetting = database.collection('settings').doc("notification_setting");
             var versionRef = database.collection('settings').doc("update_app");
             var otherSettingsRef = database.collection('settings').doc("other_settings");
+            var bookingSettingRef = database.collection('settings').doc("booking_setting");
+
+            // Defaults used by the customer and employee apps when settings/booking_setting is missing
+            var bookingSettingDefaults = {
+                turnThreshold: 15,
+                etaWindowMinutes: 15,
+                defaultRatePerHour: 20,
+                qrRefreshSeconds: 60,
+                qrMaxAgeMinutes: 10
+            };
 
             var refVeh = database.collection('vehicle_type').orderBy('name','asc');
             var vehicleType = '';
@@ -298,6 +368,18 @@
 
                 });
 
+                bookingSettingRef.get().then(function(snapshot) {
+                    var data = snapshot.exists ? snapshot.data() : {};
+                    var value = function(key) {
+                        return (data[key] !== undefined && data[key] !== null && data[key] !== '') ? data[key] : bookingSettingDefaults[key];
+                    };
+                    $("#booking_turn_threshold").val(value('turnThreshold'));
+                    $("#booking_eta_window_minutes").val(value('etaWindowMinutes'));
+                    $("#booking_default_rate_per_hour").val(value('defaultRatePerHour'));
+                    $("#booking_qr_refresh_seconds").val(value('qrRefreshSeconds'));
+                    $("#booking_qr_max_age_minutes").val(value('qrMaxAgeMinutes'));
+                });
+
                 $(".save_global_settings_btn").click(async function() {
 
 
@@ -312,6 +394,7 @@
                     var employee_app_version = $("#employee_app_version").val();
                     var employee_app_link = $("#employee_app_link").val();
                     var isAllowForAllPetrolPump = $("#allow_for_all_petrol_pump").is(":checked");
+                    var bookingSettingError = validateBookingSetting();
 
                     if (email == '') {
                         $(".error_top").show();
@@ -369,6 +452,11 @@
                         $(".error_top").html("");
                         $(".error_top").append("<p>{{ trans('lang.employee_link_help') }}</p>");
                         window.scrollTo(0, 0);
+                    } else if (bookingSettingError != '') {
+                        $(".error_top").show();
+                        $(".error_top").html("");
+                        $(".error_top").append("<p>" + bookingSettingError + "</p>");
+                        window.scrollTo(0, 0);
                     } else {
 
                         jQuery("#overlay").show();
@@ -397,6 +485,14 @@
 
                         await otherSettingsRef.set({
                             allow_for_all_petrol_pump: isAllowForAllPetrolPump
+                        }, { merge: true });
+
+                        await bookingSettingRef.set({
+                            turnThreshold: parseInt($("#booking_turn_threshold").val(), 10),
+                            etaWindowMinutes: parseInt($("#booking_eta_window_minutes").val(), 10),
+                            defaultRatePerHour: parseFloat($("#booking_default_rate_per_hour").val()),
+                            qrRefreshSeconds: parseInt($("#booking_qr_refresh_seconds").val(), 10),
+                            qrMaxAgeMinutes: parseInt($("#booking_qr_max_age_minutes").val(), 10)
                         }, { merge: true });
 
                         await database.collection('settings').doc("contactUs").update({
@@ -558,6 +654,35 @@
                 
                 $('.pending-user-reset-fuel-btn').html("reverted " + mergedCustomerIds.length + ' Users of old apk')
             });
+
+            // Returns an error message, or '' when the booking settings are valid
+            function validateBookingSetting() {
+                var isWholeNumber = function(value) {
+                    return /^\d+$/.test(String(value).trim());
+                };
+                var turnThreshold = $("#booking_turn_threshold").val();
+                var etaWindowMinutes = $("#booking_eta_window_minutes").val();
+                var defaultRatePerHour = $("#booking_default_rate_per_hour").val();
+                var qrRefreshSeconds = $("#booking_qr_refresh_seconds").val();
+                var qrMaxAgeMinutes = $("#booking_qr_max_age_minutes").val();
+
+                if (!isWholeNumber(turnThreshold) || parseInt(turnThreshold, 10) < 1 || parseInt(turnThreshold, 10) > 100) {
+                    return "{{ trans('lang.booking_turn_threshold_error') }}";
+                }
+                if (!isWholeNumber(etaWindowMinutes) || parseInt(etaWindowMinutes, 10) > 120) {
+                    return "{{ trans('lang.booking_eta_window_minutes_error') }}";
+                }
+                if (defaultRatePerHour === '' || isNaN(defaultRatePerHour) || parseFloat(defaultRatePerHour) <= 0 || parseFloat(defaultRatePerHour) > 500) {
+                    return "{{ trans('lang.booking_default_rate_per_hour_error') }}";
+                }
+                if (!isWholeNumber(qrRefreshSeconds) || parseInt(qrRefreshSeconds, 10) < 15 || parseInt(qrRefreshSeconds, 10) > 600) {
+                    return "{{ trans('lang.booking_qr_refresh_seconds_error') }}";
+                }
+                if (!isWholeNumber(qrMaxAgeMinutes) || parseInt(qrMaxAgeMinutes, 10) < 1 || parseInt(qrMaxAgeMinutes, 10) < parseInt(qrRefreshSeconds, 10) / 60) {
+                    return "{{ trans('lang.booking_qr_max_age_minutes_error') }}";
+                }
+                return '';
+            }
 
             jQuery(".pending-user-reset-fuel-btn").on("click", function() {
                 var form = $('<form action="/reverted-quota-users-list" method="POST"></form>');

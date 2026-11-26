@@ -153,6 +153,21 @@
         </div>
     </div>
 
+    <!-- Linked distribution (advance booking) -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">{{ trans('lang.distribution') }}</h5>
+        </div>
+        <div class="card-body p-3">
+            <div id="distribution_container">
+                <p class="text-muted mb-0">{{ trans('lang.fuel_request_no_distribution') }}</p>
+            </div>
+            <div class="form-text text-muted mt-2">
+                {{ trans('lang.fuel_request_distribution_help') }}
+            </div>
+        </div>
+    </div>
+
     <!-- Payment Proof -->
     <div class="card shadow-sm">
         <div class="card-header bg-light">
@@ -216,12 +231,15 @@
 @endsection
 
 @section('scripts')
+@include('distributions.status_functions')
 <script>
     var database = firebase.firestore();
     var requestsRef = database.collection('fuel_request');
     var fuelTypesRef = database.collection('fuel_type');
     var usersRef = database.collection('users');
     var requestId = "{{ $id }}";
+    var requestOwnerId = '';
+    var linkedDistribution = null;
 
     $(document).ready(async function () {
         if (!requestId) return;
@@ -236,6 +254,7 @@
             }
 
             const data = docSnap.data();
+            requestOwnerId = data.ownerId || '';
             $('#request_id').text(data.id);
             $('#fuel_quota').text((data.fuelQuota || '') + ' L');
             $('#status').val(data.status || '');
@@ -291,6 +310,7 @@
 
 
             updateStatusDropdown(data.status);
+            await loadLinkedDistribution();
         } catch (err) {
             console.error(err);
             showError("{{ trans('lang.error_loading_request') }}: " + err.message);
@@ -327,6 +347,35 @@
                 $('#fuel_capacity').text((fuel.fuelCapacity || '0') + ' L');
             }
         });
+    }
+
+    // U1: the distribution the owner published with this request (distributions.fuelRequestId)
+    async function loadLinkedDistribution() {
+        var snapshot = await database.collection('distributions').where('fuelRequestId', '==', requestId).get();
+        if (snapshot.empty) {
+            linkedDistribution = null;
+            return;
+        }
+        var doc = snapshot.docs[0];
+        linkedDistribution = doc.data();
+        linkedDistribution.id = linkedDistribution.id || doc.id;
+
+        var viewRoute = '{{ route("distributions.view", ":id") }}'.replace(':id', encodeURIComponent(linkedDistribution.id));
+        $('#distribution_container').html(
+            '<ul class="list-group list-group-flush">' +
+                '<li class="list-group-item d-flex justify-content-between">' +
+                    '<span class="font-weight-bold">{{ trans("lang.status") }}</span>' +
+                    '<span>' + distributionStatusBadge(linkedDistribution.status) + '</span>' +
+                '</li>' +
+                '<li class="list-group-item d-flex justify-content-between">' +
+                    '<span class="font-weight-bold">{{ trans("lang.distribution_registered_spots") }}</span>' +
+                    '<span class="text-muted">' + escapeHtml(linkedDistribution.registeredCount || 0) + ' / ' + escapeHtml(linkedDistribution.totalSpots || 0) + '</span>' +
+                '</li>' +
+                '<li class="list-group-item text-right">' +
+                    '<a href="' + viewRoute + '" class="btn btn-sm btn-info"><i class="fa fa-eye"></i> {{ trans("lang.distribution_open") }}</a>' +
+                '</li>' +
+            '</ul>'
+        );
     }
 
     function formatDate(date) {
@@ -378,19 +427,55 @@
             return;
         }
 
+        // U1: rejecting a request cancels its distribution, so its booked customers are told (F3)
+        var cancelDistribution = false;
+        if (newStatus === 'rejectedByAdmin' && linkedDistribution && distributionCanCancel(linkedDistribution.status)) {
+            cancelDistribution = confirm("{{ trans('lang.fuel_request_reject_cancel_confirm') }}"
+                .replace(':count', linkedDistribution.registeredCount || 0));
+        }
+
         jQuery("#overlay").show();
         try {
             await requestsRef.doc(requestId).update({
                 status: newStatus,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-            jQuery("#overlay").hide();
-            window.location.href = "{{ route('fuel.request') }}";
         } catch (err) {
             console.error(err);
             jQuery("#overlay").hide();
             showError('{{ trans("lang.error_updating_status") }}: ' + err.message);
+            return;
         }
+
+        var message = '';
+        if (cancelDistribution) {
+            try {
+                var summary = await changeDistributionStatus(linkedDistribution.id, 'cancelled');
+                message = "{{ trans('lang.distribution_status_updated') }}".replace(':status', distributionStatusLabel('cancelled')) +
+                    ' ' + distributionSummaryText(summary);
+            } catch (err) {
+                console.error(err);
+                message = "{{ trans('lang.fuel_request_cancel_distribution_failed') }} " + err.message;
+            }
+        }
+
+        jQuery("#overlay").hide();
+        if (message !== '') {
+            alert(message);
+        }
+
+        // F5: the delivery is recorded when the station's allocation is updated on the owner page
+        if (newStatus === 'completedByAdmin' && requestOwnerId) {
+            var completedMessage = "{{ trans('lang.fuel_request_completed_allocate_confirm') }}";
+            if (linkedDistribution && distributionCanCancel(linkedDistribution.status)) {
+                completedMessage = "{{ trans('lang.fuel_request_supplied_unlocked') }} " + completedMessage;
+            }
+            if (confirm(completedMessage)) {
+                window.location.href = '{{ route("owners.edit", ":id") }}'.replace(':id', encodeURIComponent(requestOwnerId));
+                return;
+            }
+        }
+        window.location.href = "{{ route('fuel.request') }}";
     });
 
     // OPEN IMAGE MODAL

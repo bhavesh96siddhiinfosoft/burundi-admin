@@ -18,6 +18,7 @@
     </div>
 
     <div class="container-fluid">
+        <div class="alert alert-warning">{{ trans('lang.odometer_historical_notice') }}</div>
         <div class="row">
             <div class="col-12">
                 <div class="card">

@@ -25,6 +25,11 @@ class OwnersController extends Controller
     {
         return view("owners.view",compact("id"));
     }
+
+    public function fuelReceipts($id)
+    {
+        return view("owners.fuel_receipts",compact("id"));
+    }
    public function deletedOwner(){
         return view('owners.deleted-owner');
    }

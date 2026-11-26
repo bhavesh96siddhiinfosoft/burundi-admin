@@ -303,7 +303,9 @@
                 html = html + '<td class="action-btn"><a href="javascript:void(0)" class="btn btn-primary btn-sm" name="show-documents" data-verified="false" id="' + val.id + '">{{ trans('lang.verify_document') }}</a></td>';
 
             }
+            var receiptsRoute = '{{ route('owners.fuelReceipts', ':id') }}'.replace(':id', id);
             html = html + '<td class="action-btn"><a href="' + route1 + '"><i class="fa fa-edit"></i></a>';
+            html = html + '<a href="' + receiptsRoute + '" title="{{ trans('lang.fuel_receiving_history') }}"><i class="fa fa-history"></i></a>';
             if (checkDeletePermission) {
                 html = html + '<a id="' + val.id + '" name="owner-delete" class="do_not_delete" href="javascript:void(0)"><i class="fa fa-trash"></i></a>';
             }

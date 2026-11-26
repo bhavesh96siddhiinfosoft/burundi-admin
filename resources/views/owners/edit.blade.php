@@ -120,6 +120,33 @@
                                     </div>
                                 </div>
                                 <div class="form-group row width-50">
+                                    <label class="col-3 control-label">{{ trans('lang.station_phone') }}</label>
+                                    <div class="col-7">
+                                        <input type="text" class="form-control station_phone" placeholder="+257 79 000 000">
+                                        <div class="form-text text-muted">
+                                            {{ trans('lang.station_phone_help') }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group row width-50">
+                                    <label class="col-3 control-label">{{ trans('lang.opening_hours') }}</label>
+                                    <div class="col-7">
+                                        <input type="text" class="form-control opening_hours" placeholder="Mon-Sat 07:00-19:00">
+                                        <div class="form-text text-muted">
+                                            {{ trans('lang.opening_hours_help') }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group row width-50">
+                                    <label class="col-3 control-label">{{ trans('lang.station_services') }}</label>
+                                    <div class="col-7">
+                                        <input type="text" class="form-control station_services" placeholder="Air, Shop, Toilets">
+                                        <div class="form-text text-muted">
+                                            {{ trans('lang.station_services_help') }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group row width-50">
                                     <label class="col-3 control-label">{{ trans('lang.select_fuel_type') }}<span class="required-field"></span></label>
 
                                     <div id="fuel_type_div"></div>
@@ -173,6 +200,7 @@
                 </div>
                 <div class="form-group col-12 text-center btm-btn">
                     <button type="button" class="btn btn-primary  save_user_btn"><i class="fa fa-save"></i> {{ trans('lang.save') }}</button>
+                    <a href="{{ route('owners.fuelReceipts', $id) }}" class="btn btn-info"><i class="fa fa-history"></i> {{ trans('lang.fuel_receiving_history') }}</a>
                     <a href="{!! route('owners') !!}" class="btn btn-default"><i class="fa fa-undo"></i>{{ trans('lang.cancel') }}</a>
                 </div>
             </div>
@@ -218,6 +246,9 @@
         var allocatedOtherDate = '';
         var lastStatus = '';
         var fcmToken = '';
+        var pendingFuelRequests = [];
+        var fuelTypesRendered = false;
+        var pendingRequestsLoaded = false;
         $(document).ready(function() {
 
             $('.owner_menu').addClass('active');
@@ -305,6 +336,12 @@
                         capacityhtml = capacityhtml + '<div class="col-7">';
                         capacityhtml = capacityhtml + '<input type="text" class="form-control" id="' + data.name + '_capacity">';
                         capacityhtml = capacityhtml + '<input type="hidden" class="form-control" id="' + data.name + '_available_capacity">';
+                        // Which completed fuel request this allocation delivers (fuel_receipts)
+                        capacityhtml = capacityhtml + '<div class="d-none mt-2 allocation_request_box" data-fuel-type-id="' + data.id + '">';
+                        capacityhtml = capacityhtml + '<label class="control-label">{{ trans('lang.fuel_receipt_allocation_for') }}</label>';
+                        capacityhtml = capacityhtml + '<select class="form-control" id="' + data.name + '_allocation_request"></select>';
+                        capacityhtml = capacityhtml + '<div class="form-text text-muted">{{ trans('lang.fuel_receipt_allocation_for_help') }}</div>';
+                        capacityhtml = capacityhtml + '</div>';
 
                         capacityhtml = capacityhtml + '</div>';
                         capacityhtml = capacityhtml + '</div>';
@@ -314,7 +351,29 @@
                     $('#fuel_capacity_div').html(capacityhtml);
 
                 }
+                fuelTypesRendered = true;
+                renderAllocationRequestSelects();
             })
+
+            // Completed fuel requests of this station that have no delivery record yet
+            Promise.all([
+                database.collection('fuel_request').where('ownerId', '==', id).get(),
+                database.collection('fuel_receipts').where('ownerId', '==', id).get()
+            ]).then(function(snapshots) {
+                var requests = snapshots[0].docs.map(function(doc) {
+                    var data = doc.data();
+                    data.id = data.id || doc.id;
+                    return data;
+                });
+                var receipts = snapshots[1].docs.map(function(doc) {
+                    return doc.data();
+                });
+                pendingFuelRequests = pendingFuelRequestsFrom(requests, receipts);
+                pendingRequestsLoaded = true;
+                renderAllocationRequestSelects();
+            }).catch(function(error) {
+                console.error(error);
+            });
             $('.fuel_type').on('click', function() {
                 toggleCapacityFields();
             });
@@ -353,6 +412,9 @@
                 }
                 $(".fuel_station_name").val(user.fuelStationName);
                 $(".fuel_station_address").val(user.fuelStationAddress);
+                $(".station_phone").val(user.stationPhone || '');
+                $(".opening_hours").val(user.openingHours || '');
+                $(".station_services").val(Array.isArray(user.stationServices) ? user.stationServices.join(', ') : '');
               
                 allocatedFuelDate = user.allocatedFuelDate;
 
@@ -435,6 +497,7 @@
 
                 var selectedCheckbox = false;
                 var fuel = [];
+                var fuelReceipts = [];
                 var checkCapacityGreaterCount = 0;
                 var checkEmptyCapacityValCount = 0;
                 const updateData = {};
@@ -461,8 +524,10 @@
                                 'name': value,
                                 'totalFuelQuota': capacityVal
                             }
+                            var isNewAllocation = false;
 
                             if (value == "Petrol" && parseInt(lastPetrolCapacity) !== parseInt(capacityVal)) {
+                                isNewAllocation = true;
                                 var remaining = $('#Petrol_available_capacity').val();
                                 updateData['allocatedPetrolDate'] = firebase.firestore.FieldValue.serverTimestamp();
                                 //fuelObj.availableFuelQuota = capacityVal;
@@ -476,6 +541,7 @@
                                 await addResetHistory(lastPetrolCapacity, capacityVal, remaining, 'Petrol');
 
                             } else if (value == 'Diesel' && parseInt(lastDieselCapacity) !== parseInt(capacityVal)) {
+                                isNewAllocation = true;
                                 updateData['allocatedDieselDate'] = firebase.firestore.FieldValue.serverTimestamp();
                                 var remaining = $('#Diesel_available_capacity').val();
                                 //fuelObj.availableFuelQuota = capacityVal;
@@ -490,6 +556,7 @@
                                 await addResetHistory(lastDieselCapacity, capacityVal, remaining, 'Diesel');
 
                             } else if (value == 'Other' && parseInt(lastOtherCapacity) !== parseInt(capacityVal)) {
+                                isNewAllocation = true;
                                 var remaining = $('#Other_available_capacity').val();
                                 updateData['allocatedOtherDate'] = firebase.firestore.FieldValue.serverTimestamp();
                                 //fuelObj.availableFuelQuota = capacityVal;
@@ -505,6 +572,14 @@
 
                             }
 
+                            // New allocation for this fuel: record it as a delivery (fuel_receipts)
+                            if (isNewAllocation && parseFloat(capacityVal) > 0) {
+                                var linkedRequestId = $('#' + value + '_allocation_request').val() || '';
+                                var linkedRequest = pendingFuelRequests.find(function(request) {
+                                    return request.id === linkedRequestId && request.fuelTypeId === fuelTypeId;
+                                });
+                                fuelReceipts.push(allocationReceipt(fuelTypeId, value, capacityVal, linkedRequest));
+                            }
 
                             fuel.push(fuelObj);
 
@@ -602,6 +677,14 @@
                         updateData['fuelStationAddress'] = address;
                         updateData['fuelStationName'] = fuelStationName;
                         updateData['password'] = password;
+                        // Shown to customers; copied into each new distribution when it is published
+                        updateData['stationPhone'] = $('.station_phone').val().trim();
+                        updateData['openingHours'] = $('.opening_hours').val().trim();
+                        updateData['stationServices'] = $('.station_services').val().split(',').map(function(service) {
+                            return service.trim();
+                        }).filter(function(service) {
+                            return service !== '';
+                        });
 
 
                         await storeBusinessImageData().then(async BusinessImage => {
@@ -611,8 +694,28 @@
                                 updateData['isActive'] = isActive;
                                 updateData['deactiveReason'] = deactiveReason;
                                 updateData['fuelUpdatedAt'] = firebase.firestore.FieldValue.serverTimestamp();
-                               
-                                await database.collection('users').doc(id).update(updateData).then(async function(result) {
+
+                                // The stock update and its fuel_receipts are written together
+                                var saveBatch = database.batch();
+                                saveBatch.update(database.collection('users').doc(id), updateData);
+                                fuelReceipts.forEach(function(receipt) {
+                                    var receiptRef = database.collection('fuel_receipts').doc();
+                                    saveBatch.set(receiptRef, {
+                                        'id': receiptRef.id,
+                                        'ownerId': id,
+                                        'fuelTypeId': receipt.fuelTypeId,
+                                        'fuelTypeName': receipt.fuelTypeName,
+                                        'litres': receipt.litres,
+                                        'receivedAt': firebase.firestore.FieldValue.serverTimestamp(),
+                                        'source': receipt.source,
+                                        'fuelRequestId': receipt.fuelRequestId,
+                                        'note': null,
+                                        'createdBy': '{{ auth()->id() }}',
+                                        'createdAt': firebase.firestore.FieldValue.serverTimestamp()
+                                    });
+                                });
+
+                                await saveBatch.commit().then(async function(result) {
                                     await database.collection('users').doc(id).update({
                                         fuel: updateData.fuel 
                                     }); 
@@ -645,6 +748,62 @@
                 }
             })
         })
+
+        // Completed fuel requests with no fuel_receipts record yet, oldest first
+        function pendingFuelRequestsFrom(requests, receipts) {
+            var recorded = {};
+            receipts.forEach(function(receipt) {
+                if (receipt.fuelRequestId) {
+                    recorded[receipt.fuelRequestId] = true;
+                }
+            });
+            var requestTime = function(request) {
+                var time = request.updatedAt || request.createdAt;
+                return time && time.toMillis ? time.toMillis() : 0;
+            };
+            return requests.filter(function(request) {
+                return request.status === 'completedByAdmin' && !recorded[request.id];
+            }).sort(function(a, b) {
+                return requestTime(a) - requestTime(b);
+            });
+        }
+
+        // The delivery recorded for a new allocation: the linked request's litres, or else the allocated litres
+        function allocationReceipt(fuelTypeId, fuelTypeName, allocatedLitres, linkedRequest) {
+            var requestLitres = linkedRequest ? parseFloat(linkedRequest.fuelQuota) : NaN;
+            return {
+                'fuelTypeId': fuelTypeId,
+                'fuelTypeName': fuelTypeName,
+                'litres': requestLitres > 0 ? requestLitres : parseFloat(allocatedLitres),
+                'source': linkedRequest ? 'fuel_request' : 'allocation',
+                'fuelRequestId': linkedRequest ? linkedRequest.id : null
+            };
+        }
+
+        // Each fuel offers its pending requests (oldest selected) or a direct allocation
+        function renderAllocationRequestSelects() {
+            if (!fuelTypesRendered || !pendingRequestsLoaded) {
+                return;
+            }
+            $('.allocation_request_box').each(function() {
+                var box = $(this);
+                var fuelTypeId = box.attr('data-fuel-type-id');
+                var requests = pendingFuelRequests.filter(function(request) {
+                    return request.fuelTypeId === fuelTypeId;
+                });
+                if (requests.length === 0) {
+                    box.addClass('d-none');
+                    return;
+                }
+                var html = '';
+                requests.forEach(function(request) {
+                    html += '<option value="' + request.id + '">{{ trans('lang.fuel_request') }} #' + request.id + ' - ' + (request.fuelQuota || '') + ' {{ trans('lang.liter') }}</option>';
+                });
+                html += '<option value="">{{ trans('lang.fuel_receipt_no_request') }}</option>';
+                box.find('select').html(html);
+                box.removeClass('d-none');
+            });
+        }
 
         async function addResetHistory(lastCapacity, capacityVal, remaining, fuelType) {
             var tempId = database.collection('temp').doc().id;

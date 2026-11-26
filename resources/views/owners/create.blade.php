@@ -423,7 +423,27 @@
             storeBusinessImageData().then(BusinessImage => {
                 storeDocumentsImageData().then(DocumentImage => {
 
-                    database.collection('users').doc(id).set({
+                    // The new station and its first allocation (fuel_receipts) are written together
+                    var createBatch = database.batch();
+                    fuel.forEach(function (fuelObj) {
+                        if (parseFloat(fuelObj.totalFuelQuota) > 0) {
+                            var receiptRef = database.collection('fuel_receipts').doc();
+                            createBatch.set(receiptRef, {
+                                'id': receiptRef.id,
+                                'ownerId': id,
+                                'fuelTypeId': fuelObj.fuelTypeId,
+                                'fuelTypeName': fuelObj.name,
+                                'litres': parseFloat(fuelObj.totalFuelQuota),
+                                'receivedAt': createdAt,
+                                'source': 'allocation',
+                                'fuelRequestId': null,
+                                'note': null,
+                                'createdBy': '{{ auth()->id() }}',
+                                'createdAt': createdAt
+                            });
+                        }
+                    });
+                    createBatch.set(database.collection('users').doc(id), {
                         'fullName': fullName,
                         'countryCode': countryCode,
                         'mobileNumber': phone,
@@ -441,7 +461,8 @@
                         'allocatedFuelDate': createdAt,
                         'password': password
 
-                    }).then(async function (result) {
+                    });
+                    return createBatch.commit().then(async function (result) {
                          logFirebaseActivity('#' + id + ' {{trans("lang.user")}} {{trans("lang.created")}}');
                         window.location.href = '{{ route("owners")}}';
 

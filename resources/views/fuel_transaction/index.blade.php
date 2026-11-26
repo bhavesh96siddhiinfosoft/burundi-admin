@@ -497,10 +497,11 @@
                 html.push(val.status);
                 html.push(val.adminAvailableFuelQuota+' {{trans("lang.liter")}}')
                 newhtml = '';
+                // Odometer capture was removed from the apps: only older transactions have a reading
                 if(val.odometerReadingId && val.odometerReadingId != null && val.odometerReadingId != ''){
                     var viewRoute = '{{ route('customers.odometerReadingHistoryView', ':id') }}';
                     viewRoute = viewRoute.replace(':id', val.odometerReadingId);
-                    newhtml = `<a href="${viewRoute}"><i class="fa fa-clock"></i> {{trans("lang.odometer_reading")}}</a>`;
+                    newhtml = `<a href="${viewRoute}"><i class="fa fa-clock"></i> {{trans("lang.odometer_reading_historical")}}</a>`;
                 }
                 html.push(newhtml);
                 return html;

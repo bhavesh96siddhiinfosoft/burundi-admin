@@ -32,6 +32,7 @@ Route::post('/log-activity', [App\Http\Controllers\HomeController::class, 'saveL
 Route::get('/dashboard', [App\Http\Controllers\HomeController::class, 'index'])->name('dashboard');
 Route::get('lang/change', [App\Http\Controllers\LangController::class, 'change'])->name('changeLang');
 Route::post('notification/send', [App\Http\Controllers\NotificationController::class, 'sendNotification'])->name('sendNotification');
+Route::post('notification/send-booking', [App\Http\Controllers\NotificationController::class, 'sendBookingNotification'])->name('sendBookingNotification');
 
 Route::middleware(['permission:fuel-request,fuel.request.list'])->group(function () {
    Route::get('/fuel-request', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelRequestListing'])->name('fuel.request');
@@ -46,6 +47,10 @@ Route::middleware(['permission:fuel-purchase,fuel.purchase.list'])->group(functi
 Route::get('/fuel-receivings', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelReceivingsListing'])->name('fuel.receivings');
 Route::middleware(['permission:fuel-receive,fuel.receive.list'])->group(function () {
    Route::get('/fuel-receivings/save/{id?}', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelReceivingsSave'])->name('fuel.receivings.form');
+});
+Route::middleware(['permission:distributions,distributions.list'])->group(function () {
+   Route::get('/distributions', [App\Http\Controllers\DistributionController::class, 'index'])->name('distributions');
+   Route::get('/distributions/view/{id}', [App\Http\Controllers\DistributionController::class, 'view'])->name('distributions.view');
 });
 Route::middleware(['permission:fuel-tax,fuel.tax.list'])->group(function () {
    Route::get('/fuel/tax_verifications', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelTaxVerificationsListing'])->name('fuel.tax_verifications');
@@ -87,6 +92,7 @@ Route::middleware(['permission:pending_owners,pending.owner.list'])->group(funct
 });
 Route::middleware(['permission:owners,owner.edit'])->group(function () {
    Route::get('/owners/edit/{id}', [App\Http\Controllers\OwnersController::class, 'edit'])->name('owners.edit');
+   Route::get('/owners/fuel-receipts/{id}', [App\Http\Controllers\OwnersController::class, 'fuelReceipts'])->name('owners.fuelReceipts');
 });
 Route::middleware(['permission:owners,owner.create'])->group(function () {
    Route::get('/owners/create', [App\Http\Controllers\OwnersController::class, 'create'])->name('owners.create');
