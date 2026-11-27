@@ -3,6 +3,24 @@
     The receipt of a request always has the id request_<requestId>, so a request is never recorded twice.
 --}}
 <script>
+    // Text and date helpers of the fuel request pages (the distribution pages have the same ones in their partial)
+    function escapeHtml(value) {
+        return String(value === undefined || value === null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function formatFirestoreDate(timestamp) {
+        if (!timestamp || typeof timestamp.toDate !== 'function') {
+            return '';
+        }
+        var date = timestamp.toDate();
+        return date.toDateString() + ' ' + date.toLocaleTimeString('en-US');
+    }
+
     function fuelRequestReceiptId(requestId) {
         return 'request_' + requestId;
     }

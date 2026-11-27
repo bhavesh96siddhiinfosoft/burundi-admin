@@ -20,7 +20,8 @@ $role_has_permission = App\Models\Permission::where('role_id', $user->role_id)->
             in_array('fuel-purchase', $role_has_permission) ||
             in_array('fuel-receive', $role_has_permission) ||
             in_array('fuel-tax', $role_has_permission) ||
-            in_array('fuel-request', $role_has_permission)
+            in_array('fuel-request', $role_has_permission) ||
+            in_array('distributions', $role_has_permission)
         )
             <li class="nav-subtitle">
                 <span class="nav-subtitle-span">{{ trans('lang.fuel_management') }}</span>
@@ -52,11 +53,17 @@ $role_has_permission = App\Models\Permission::where('role_id', $user->role_id)->
         @endif
         @if(in_array('fuel-request', $role_has_permission))
             <li>
-                <a href="{!! url('distribution-fuel-request') !!}" class="waves-effect waves-dark">
+                <a href="{!! url('fuel-request') !!}" class="waves-effect waves-dark">
                     <i class="mdi mdi-checkbox-marked-circle-outline"></i>
-                    <span class="hide-menu">{{trans('lang.distribution_fuel_request')}}
-                        <span class="badge badge-pill badge-danger ml-1 d-none" id="dfr_menu_badge" title="{{ trans('lang.dfr_needs_action_only') }}"></span>
-                    </span>
+                    <span class="hide-menu">{{trans('lang.fuel_request')}}</span>
+                </a>
+            </li>
+        @endif
+        @if(in_array('distributions', $role_has_permission))
+            <li>
+                <a href="{!! url('distributions') !!}" class="waves-effect waves-dark">
+                    <i class="mdi mdi-calendar-clock"></i>
+                    <span class="hide-menu">{{trans('lang.distributions')}}</span>
                 </a>
             </li>
         @endif

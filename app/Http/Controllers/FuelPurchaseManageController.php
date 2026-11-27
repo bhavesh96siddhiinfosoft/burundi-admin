@@ -30,7 +30,20 @@ class FuelPurchaseManageController extends Controller
         return view('fuel_tax_verification.index'); 
     }
     public function fuelTaxVerificationsSave($id = '')
+    { 
+        return view('fuel_tax_verification.save', compact('id')); 
+    }
+
+    public function fuelRequestListing()
+    { 
+        return view('fuel_request.index'); 
+    }
+    public function fuelRequestSave($id = '')
     {
-        return view('fuel_tax_verification.save', compact('id'));
+        return view('fuel_request.save', compact('id'));
+    }
+    public function fuelRequestReceive($id)
+    {
+        return view('fuel_request.receive', compact('id'));
     }
 }

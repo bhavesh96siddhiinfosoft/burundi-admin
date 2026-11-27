@@ -618,12 +618,21 @@
                                                     </td> -->
                                                 </tr>
                                                  <tr>
-                                                    <td><strong>{{trans('lang.distribution_fuel_request')}}</strong></td>
+                                                    <td><strong>{{trans('lang.fuel_request')}}</strong></td>
 
                                                     <td>
                                                         <input type="checkbox" id="fuel-request-list"
                                                             value="fuel.request.list" name="fuel-request[]" class="permission">
                                                         <label class="control-label2" for="fuel-request-list">{{trans('lang.manage')}}</label>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>{{trans('lang.distributions')}}</strong></td>
+
+                                                    <td>
+                                                        <input type="checkbox" id="distributions-list"
+                                                            value="distributions.list" name="distributions[]" class="permission">
+                                                        <label class="control-label2" for="distributions-list">{{trans('lang.manage')}}</label>
                                                     </td>
                                                 </tr>
                                                  <tr>

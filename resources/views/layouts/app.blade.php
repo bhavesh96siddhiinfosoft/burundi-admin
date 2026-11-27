@@ -232,12 +232,6 @@
 
     </script>
 
-    {{-- The list and detail pages of the tab count the badge themselves --}}
-    @if(auth()->check() && !request()->routeIs('distribution.fuel.request', 'distribution.fuel.request.view') &&
-        App\Models\Permission::where('role_id', auth()->user()->role_id)->where('permission', 'fuel-request')->exists())
-        @include('distribution_fuel_request.menu_badge')
-    @endif
-
     @yield('scripts')
 
 </body>

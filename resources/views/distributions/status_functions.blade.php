@@ -1,5 +1,6 @@
 {{--
-    Distribution status helpers, shared by the distribution detail page and the fuel request page.
+    Distribution status helpers, used by the distribution pages. Distributions and fuel requests are separate
+    features: nothing here reads a fuel request.
     F2: only the admin moves the status, one step at a time, inside a transaction.
     F3: every status change notifies the customers with an active registration.
     F4: when the distribution starts, the first customers in line are told their turn is approaching.
@@ -133,14 +134,6 @@
                 }
             } else if (distributionNextStatus(currentStatus) !== newStatus) {
                 throw new Error("{{ trans('lang.distribution_status_changed_error') }}".replace(':status', distributionStatusLabel(currentStatus)));
-            }
-
-            // Supplied only once the linked fuel request's payment is approved
-            if (newStatus === 'supplied' && data.fuelRequestId) {
-                var requestSnapshot = await transaction.get(database.collection('fuel_request').doc(data.fuelRequestId));
-                if (!requestSnapshot.exists || requestSnapshot.data().status !== 'completedByAdmin') {
-                    throw new Error("{{ trans('lang.distribution_supplied_gate_error') }}");
-                }
             }
 
             var now = firebase.firestore.FieldValue.serverTimestamp();
@@ -356,5 +349,35 @@
             text += ' ' + "{{ trans('lang.distribution_summary_turn') }}".replace(':count', summary.turn.notified);
         }
         return text;
+    }
+
+    /**
+     * Deletes a closed (completed or cancelled) distribution and its booking_registrations (1.4).
+     * The registrations go first, so a failure leaves the distribution in place and Delete can run again.
+     * Customers are already free to book elsewhere once a distribution is closed, so nothing else changes.
+     */
+    async function deleteDistribution(distributionId) {
+        var distributionRef = database.collection('distributions').doc(distributionId);
+        var snapshot = await distributionRef.get();
+        if (!snapshot.exists) {
+            throw new Error("{{ trans('lang.distribution_not_found') }}");
+        }
+        var status = snapshot.data().status || 'scheduled';
+        if (distributionCanCancel(status)) {
+            throw new Error("{{ trans('lang.distribution_delete_open_error') }}".replace(':status', distributionStatusLabel(status)));
+        }
+
+        var registrations = await database.collection('booking_registrations').where('distributionId', '==', distributionId).get();
+        // A batch holds at most 500 writes
+        for (var i = 0; i < registrations.docs.length; i += 500) {
+            var batch = database.batch();
+            registrations.docs.slice(i, i + 500).forEach(function (doc) {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+        }
+        await distributionRef.delete();
+        logFirebaseActivity('#' + distributionId + ' {{ trans("lang.distribution") }} : {{ trans("lang.delete") }}');
+        return registrations.docs.length;
     }
 </script>

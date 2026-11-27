@@ -35,14 +35,9 @@ Route::post('notification/send', [App\Http\Controllers\NotificationController::c
 Route::post('notification/send-booking', [App\Http\Controllers\NotificationController::class, 'sendBookingNotification'])->name('sendBookingNotification');
 
 Route::middleware(['permission:fuel-request,fuel.request.list'])->group(function () {
-   Route::get('/distribution-fuel-request', [App\Http\Controllers\DistributionFuelRequestController::class, 'index'])->name('distribution.fuel.request');
-   Route::get('/distribution-fuel-request/{id}', [App\Http\Controllers\DistributionFuelRequestController::class, 'view'])->name('distribution.fuel.request.view');
-   // The old Fuel Request and Distributions URLs redirect to the Distribution Fuel Request tab
-   Route::get('/fuel-request', [App\Http\Controllers\DistributionFuelRequestController::class, 'redirectToList'])->name('fuel.request');
-   Route::get('/fuel-request/save/{id?}', [App\Http\Controllers\DistributionFuelRequestController::class, 'redirectToFlow'])->name('fuel.request.form');
-   Route::get('/fuel-request/receive/{id}', [App\Http\Controllers\DistributionFuelRequestController::class, 'redirectToReceive'])->name('fuel.request.receive');
-   Route::get('/distributions', [App\Http\Controllers\DistributionFuelRequestController::class, 'redirectToList'])->name('distributions');
-   Route::get('/distributions/view/{id}', [App\Http\Controllers\DistributionFuelRequestController::class, 'redirectToFlow'])->name('distributions.view');
+   Route::get('/fuel-request', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelRequestListing'])->name('fuel.request');
+   Route::get('/fuel-request/save/{id?}', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelRequestSave'])->name('fuel.request.form');
+   Route::get('/fuel-request/receive/{id}', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelRequestReceive'])->name('fuel.request.receive');
 });
 
 Route::get('/fuel-purchases', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelPurchasesListing'])->name('fuel.purchases');
@@ -53,6 +48,11 @@ Route::middleware(['permission:fuel-purchase,fuel.purchase.list'])->group(functi
 Route::get('/fuel-receivings', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelReceivingsListing'])->name('fuel.receivings');
 Route::middleware(['permission:fuel-receive,fuel.receive.list'])->group(function () {
    Route::get('/fuel-receivings/save/{id?}', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelReceivingsSave'])->name('fuel.receivings.form');
+});
+Route::middleware(['permission:distributions,distributions.list'])->group(function () {
+   Route::get('/distributions', [App\Http\Controllers\DistributionController::class, 'index'])->name('distributions');
+   Route::get('/distributions/create', [App\Http\Controllers\DistributionController::class, 'create'])->name('distributions.create');
+   Route::get('/distributions/view/{id}', [App\Http\Controllers\DistributionController::class, 'view'])->name('distributions.view');
 });
 Route::middleware(['permission:fuel-tax,fuel.tax.list'])->group(function () {
    Route::get('/fuel/tax_verifications', [App\Http\Controllers\FuelPurchaseManageController::class, 'fuelTaxVerificationsListing'])->name('fuel.tax_verifications');
