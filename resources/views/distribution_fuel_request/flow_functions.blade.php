@@ -1,7 +1,8 @@
 {{--
     Distribution Fuel Request (F7). A flow is a fuel request plus the distribution it published
-    (distributions.fuelRequestId == fuel_request.id). A request without a distribution (made before advance
-    booking) and a distribution without a request are flows of their own.
+    (distributions.fuelRequestId == fuel_request.id). A request without a distribution and a distribution
+    without a request are flows of their own; a request without a distribution goes through the same request
+    steps as on the old Fuel Request page (approve, verify payment, add received fuel).
     The stage of a flow decides the one next step offered to the admin.
     Used by the list and detail pages, and by the menu badge (flows that need admin action) on every page,
     so it depends on nothing but the global `database`.
@@ -85,11 +86,12 @@
         } else if (requestStatus === 'paymentByOwner') {
             stage.key = 'verify_payment';
             stage.action = { type: 'verify' };
-        } else if (requestStatus === 'completedByAdmin' && !flow.receipt && distribution) {
+        } else if (requestStatus === 'completedByAdmin' && !flow.receipt) {
+            // As on the old Fuel Request page: Add received fuel, with or without a distribution
             stage.key = 'add_fuel';
             stage.action = { type: 'receive' };
         } else if (!distribution) {
-            // A completed request made before advance booking: its fuel went into stock by allocation
+            // A request without a distribution, completed with its received fuel
             stage.key = 'finished';
         } else {
             var stageByStatus = {
@@ -227,28 +229,50 @@
 
     /**
      * Only the flows that need admin action, read with a few small queries (the menu badge runs on every page).
-     * A flow can need action only while its request waits for the admin or its distribution is open,
-     * so these give exactly the same flows as loadAllFlows() filtered on needsAction.
+     * A flow can need action only while its request waits for the admin (approve, verify, or a completed request
+     * without received fuel) or its distribution is open, so these give exactly the same flows as loadAllFlows()
+     * filtered on needsAction.
      */
     async function loadNeedsActionFlows() {
         var results = await Promise.all([
-            database.collection('fuel_request').where('status', 'in', ['requestedByOwner', 'paymentByOwner']).get(),
-            database.collection('distributions').where('status', 'in', FLOW_OPEN_DISTRIBUTION_STATUSES).get()
+            database.collection('fuel_request').where('status', 'in', ['requestedByOwner', 'paymentByOwner', 'completedByAdmin']).get(),
+            database.collection('distributions').where('status', 'in', FLOW_OPEN_DISTRIBUTION_STATUSES).get(),
+            database.collection('fuel_receipts').where('source', '==', 'fuel_request').get()
         ]);
-        var requests = flowDocs(results[0]);
+        var fetchedRequests = flowDocs(results[0]);
         var openDistributions = flowDocs(results[1]);
+        var receipts = flowDocs(results[2]);
 
+        var receivedRequestIds = {};
+        receipts.forEach(function (receipt) {
+            if (receipt.fuelRequestId) {
+                receivedRequestIds[receipt.fuelRequestId] = true;
+            }
+        });
+        // A completed request with its received fuel needs action only through an open distribution (below)
+        var fetchedMap = {};
+        var requests = [];
         var requestMap = {};
-        requests.forEach(function (request) {
-            requestMap[request.id] = request;
+        fetchedRequests.forEach(function (request) {
+            fetchedMap[request.id] = request;
+            if (request.status !== 'completedByAdmin' || !receivedRequestIds[request.id]) {
+                requests.push(request);
+                requestMap[request.id] = request;
+            }
         });
 
         // The requests of the open distributions
         var missingRequestIds = [];
         openDistributions.forEach(function (distribution) {
-            if (distribution.fuelRequestId && !requestMap[distribution.fuelRequestId] &&
-                missingRequestIds.indexOf(distribution.fuelRequestId) === -1) {
-                missingRequestIds.push(distribution.fuelRequestId);
+            var requestId = distribution.fuelRequestId;
+            if (!requestId || requestMap[requestId]) {
+                return;
+            }
+            if (fetchedMap[requestId]) {
+                requests.push(fetchedMap[requestId]);
+                requestMap[requestId] = fetchedMap[requestId];
+            } else if (missingRequestIds.indexOf(requestId) === -1) {
+                missingRequestIds.push(requestId);
             }
         });
         var requestSnapshots = await Promise.all(missingRequestIds.map(function (requestId) {
@@ -263,21 +287,11 @@
         });
 
         // Every distribution of these requests (a request takes its newest one; a closed one makes the
-        // flow read-only), and the receipts of the completed ones (Fuel to add to stock)
+        // flow read-only)
         var requestIds = requests.map(function (request) {
             return request.id;
         });
-        var completedIds = requests.filter(function (request) {
-            return request.status === 'completedByAdmin';
-        }).map(function (request) {
-            return request.id;
-        });
-        var linked = await Promise.all([
-            flowQueryIn('distributions', 'fuelRequestId', requestIds),
-            flowQueryIn('fuel_receipts', 'fuelRequestId', completedIds)
-        ]);
-        var linkedDistributions = linked[0];
-        var receipts = linked[1];
+        var linkedDistributions = await flowQueryIn('distributions', 'fuelRequestId', requestIds);
 
         var distributionMap = {};
         openDistributions.concat(linkedDistributions).forEach(function (distribution) {

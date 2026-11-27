@@ -326,7 +326,7 @@
     /**
      * The Add Received Fuel to Stock form (F5) inside a container: received litres (prefilled with the requested
      * litres), received at and note, with the new stock previewed. options:
-     *   intro: show the explanation, warning: an extra warning line,
+     *   intro: show the explanation,
      *   onAdded(stock, litres): called once the fuel is in the stock, onSkip(): shows a Skip for now button.
      */
     function renderReceiveForm(container, flow, station, options) {
@@ -344,7 +344,6 @@
         };
         container.html(
             (options.intro ? '<div class="alert alert-info">' + escapeHtml("{{ trans('lang.receive_fuel_intro') }}".replace(':id', '#' + request.id)) + '</div>' : '') +
-            (options.warning ? '<div class="alert alert-warning">' + escapeHtml(options.warning) + '</div>' : '') +
             '<div class="alert alert-danger receive-error d-none"></div>' +
             '<h6 class="text-dark">{{ trans("lang.receive_fuel_station_stock") }}: ' + escapeHtml(stationFuel.name || '') + '</h6>' +
             '<ul class="list-group list-group-flush mb-3">' +

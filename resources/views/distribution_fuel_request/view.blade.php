@@ -586,7 +586,7 @@
             add(requestLabels[0], requestIndex >= 0);
             add(requestLabels[1], requestIndex >= 1);
             add(requestLabels[2], requestIndex >= 2);
-            add(requestLabels[3], requestIndex >= 3 && (!!flow.receipt || !distribution));
+            add(requestLabels[3], requestIndex >= 3 && !!flow.receipt);
             if (requestStatus === 'rejectedByAdmin') {
                 endWith("{{ trans('lang.dfr_step_rejected') }}");
                 return steps;
@@ -719,8 +719,7 @@
         }
         receiveFormKey = request.id;
         renderReceiveForm($('#flow_receive_container'), flow, station, {
-            intro: !!flow.distribution,
-            warning: flow.distribution ? '' : "{{ trans('lang.dfr_old_request_warning') }}",
+            intro: true,
             onAdded: async function (stock, litres) {
                 var message = flowReceiveDoneText(stock, litres, station);
                 var next = flowStage(await reloadFlow(flow));
