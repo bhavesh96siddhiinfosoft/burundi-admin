@@ -191,7 +191,7 @@
 
             var source = "{{ trans('lang.fuel_receipt_source_allocation') }}";
             if (receipt.source === 'fuel_request' && receipt.fuelRequestId) {
-                source = '{{ trans("lang.fuel_request") }} <a href="{{ url("fuel-request/save") }}/' + encodeURIComponent(receipt.fuelRequestId) + '">#' + escapeHtml(receipt.fuelRequestId) + '</a>';
+                source = '{{ trans("lang.fuel_request") }} <a href="{{ url("distribution-fuel-request") }}/' + encodeURIComponent(receipt.fuelRequestId) + '">#' + escapeHtml(receipt.fuelRequestId) + '</a>';
             }
 
             html += '<tr>' +
